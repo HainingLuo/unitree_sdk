@@ -102,7 +102,7 @@ RUN git clone https://github.com/unitreerobotics/unitree_ros2 && \
     source /opt/ros/${ROS_DISTRO}/setup.bash && \
     colcon build
 
-ENV ARCH=${ARCH:-amd64}
+ARG ARCH
 COPY ros_setup/setup_${ARCH}.sh /unitree_ros2/setup.sh
 
 ####################################################################################################

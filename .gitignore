@@ -3,6 +3,7 @@ out/
 data/
 unitree_sdk2/
 unitree_sdk2_python/
+*build/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

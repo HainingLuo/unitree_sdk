@@ -19,7 +19,7 @@ build-jetson:
 	docker build \
 	--build-arg BASE_IMAGE=nvcr.io/nvidia/l4t-base:r36.2.0 \
 	--build-arg ARCH=arm64 \
-	-t hainingluo/unitree_dev:jetson \
+	-t hainingluo/unitree_dev:latest \
 	-f Dockerfile .
 
 compile:
