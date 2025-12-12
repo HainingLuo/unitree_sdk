@@ -1,4 +1,5 @@
-FROM nvidia/cuda:13.0.2-base-ubuntu22.04
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
 ENV ROS_DISTRO=humble
 ENV ROS_ROOT=/opt/ros/${ROS_DISTRO}
 

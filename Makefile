@@ -9,16 +9,25 @@ IP_ADDRESS := $(shell hostname -I | cut -d' ' -f1)
 .PHONY: all
 
 build:
-	docker build -t hainingluo/unitree_sdk:latest .
+	docker build \
+	--build-arg BASE_IMAGE=nvidia/cuda:13.0.2-base-ubuntu22.04 \
+	-t hainingluo/unitree_dev:latest \
+	-f Dockerfile .
+
+build-jetson:
+	docker build \
+	--build-arg BASE_IMAGE=nvcr.io/nvidia/l4t-base:r36.2.0 \
+	-t hainingluo/unitree_dev:jetson \
+	-f Dockerfile .
 
 install-dynamixel:
 	git submodule update --init --recursive
-	docker start unitree_sdk
+	docker start unitree_dev
 	sleep 1
-	docker exec -it unitree_sdk bash -c "pip install -e third_party/DynamixelSDK/python"
+	docker exec -it unitree_dev bash -c "pip install -e third_party/DynamixelSDK/python"
 
 compile:
-	docker container stop unitree_sdk | true && docker container rm unitree_sdk | true
+	docker container stop unitree_dev | true && docker container rm unitree_dev | true
 	docker run \
 		-it \
 		-e ROS_IP="${ROS_IP}" \
@@ -32,61 +41,61 @@ compile:
 		--runtime nvidia \
 		--gpus all \
 		--network host \
-		--name unitree_sdk \
-		hainingluo/unitree_sdk
-# 	docker exec -it unitree_sdk bash -c "git config --global --add safe.directory /unitree_sdk"
-# 	docker exec -it unitree_sdk bash -c "cd /unitree_sdk && python3 -m pip install -e ."
-# 	docker exec -it unitree_sdk bash -c "cd /unitree_sdk/third_party/act && python3 -m pip install -e ."
-	docker container stop unitree_sdk
+		--name unitree_dev \
+		hainingluo/unitree_dev
+# 	docker exec -it unitree_dev bash -c "git config --global --add safe.directory /unitree_dev"
+# 	docker exec -it unitree_dev bash -c "cd /unitree_dev && python3 -m pip install -e ."
+# 	docker exec -it unitree_dev bash -c "cd /unitree_dev/third_party/act && python3 -m pip install -e ."
+	docker container stop unitree_dev
 
 run:
-	docker start unitree_sdk
+	docker start unitree_dev
 	sleep 1
-	docker exec -it unitree_sdk bash -c "source /opt/ros/noetic/setup.bash && roscore"
-	docker container stop unitree_sdk
+	docker exec -it unitree_dev bash -c "source /opt/ros/noetic/setup.bash && roscore"
+	docker container stop unitree_dev
 
 run-local:
-	docker start unitree_sdk
+	docker start unitree_dev
 	sleep 1
-	docker exec -it unitree_sdk bash -c "source /opt/ros/noetic/setup.bash && \
+	docker exec -it unitree_dev bash -c "source /opt/ros/noetic/setup.bash && \
 			export ROS_IP=127.0.0.1 && \
 			export ROS_MASTER_URI="http://127.0.0.1:11311" && roscore"
-	docker container stop unitree_sdk
+	docker container stop unitree_dev
 
 run-local-new:
-	docker start unitree_sdk
+	docker start unitree_dev
 	sleep 1
-	docker exec -it unitree_sdk bash -c "source /opt/ros/noetic/setup.bash && \
+	docker exec -it unitree_dev bash -c "source /opt/ros/noetic/setup.bash && \
 			export ROS_IP=10.101.119.100 && \
 			export ROS_MASTER_URI="http://10.101.119.100:11311" && roscore"
-	docker container stop unitree_sdk
+	docker container stop unitree_dev
 
 debug:
-	docker start unitree_sdk
+	docker start unitree_dev
 	sleep 1
-	docker exec -it unitree_sdk bash -c "bash"
+	docker exec -it unitree_dev bash -c "bash"
 
 debug-local:
 	# xhost +si:localuser:root >> /dev/null
-	docker start unitree_sdk
+	docker start unitree_dev
 	sleep 1
-	docker exec -it unitree_sdk bash -c "source /opt/ros/noetic/setup.bash && \
+	docker exec -it unitree_dev bash -c "source /opt/ros/noetic/setup.bash && \
 			export ROS_IP=127.0.0.1 &&  \
 			export ROS_MASTER_URI="http://127.0.0.1:11311" && bash"
 
 stop:
-	docker container stop unitree_sdk
+	docker container stop unitree_dev
 
 rqt-image-view:
 	xhost +si:localuser:root >> /dev/null
-	docker start unitree_sdk
-	docker exec -it unitree_sdk bash -c "source /opt/ros/noetic/setup.bash && export DISPLAY=:15 && rqt --perspective-file cfg/rqt/Default.perspective"	
+	docker start unitree_dev
+	docker exec -it unitree_dev bash -c "source /opt/ros/noetic/setup.bash && export DISPLAY=:15 && rqt --perspective-file cfg/rqt/Default.perspective"	
 
 monitor-tensorboard:
-	@docker exec -it unitree_sdk bash -c "ls data/$$task/results/" && \
-	docker start unitree_sdk && \
-	docker exec -it unitree_sdk bash -c "tensorboard --logdir=/unitree_sdk/data/$$task/results/ --port=6006 --host=$$IP_ADDRESS"
+	@docker exec -it unitree_dev bash -c "ls data/$$task/results/" && \
+	docker start unitree_dev && \
+	docker exec -it unitree_dev bash -c "tensorboard --logdir=/unitree_dev/data/$$task/results/ --port=6006 --host=$$IP_ADDRESS"
 
 monitor-gpu:
-	@docker start unitree_sdk
-	@docker exec -it unitree_sdk bash -c "watch -n 1 nvidia-smi"
+	@docker start unitree_dev
+	@docker exec -it unitree_dev bash -c "watch -n 1 nvidia-smi"
