@@ -129,5 +129,5 @@ RUN git clone https://github.com/unitreerobotics/unitree_ros2 && \
 
 ENTRYPOINT [ "" ]
 
-WORKDIR /unitree_sdk2
+WORKDIR /unitree_dev
 CMD /bin/bash
