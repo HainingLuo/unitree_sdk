@@ -1,6 +1,5 @@
-FROM nvidia/cuda:11.8.0-base-ubuntu20.04
-ARG ROS_PKG=ros_base
-ENV ROS_DISTRO=foxy
+FROM nvidia/cuda:13.0.2-base-ubuntu22.04
+ENV ROS_DISTRO=humble
 ENV ROS_ROOT=/opt/ros/${ROS_DISTRO}
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -11,7 +10,21 @@ ENV NVIDIA_DRIVER_CAPABILITIES=all
 
 SHELL ["/bin/bash", "-c"]
 
-# # change the locale from POSIX to UTF-8
+RUN apt update && \
+    apt install -y --no-install-recommends \
+        python3.11 python3-pip \
+        curl wget zip unzip tar git cmake make build-essential \
+        gnupg2 \
+        lsb-release \
+        ca-certificates \
+        ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+####################################################################################################
+######################################### ROS INSTALLATION #########################################
+####################################################################################################
+
+# Set locale
 RUN apt update && apt install -y --no-install-recommends locales && \
     locale-gen en_US en_US.UTF-8 && \
     update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8 && \
@@ -19,109 +32,96 @@ RUN apt update && apt install -y --no-install-recommends locales && \
 
 ENV LANG=en_US.UTF-8
 
-RUN apt update && \
-    DEBIAN_FRONTEND=noninteractive apt install -y --no-install-recommends \
-	python3-pip \
-	curl wget zip unzip tar git cmake make build-essential \
-	gnupg2 \
-	lsb-release \
-	ca-certificates \
-	ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
+# Add the ROS 2 apt repository
+RUN apt-get update && apt-get install -y --no-install-recommends software-properties-common && \
+    add-apt-repository universe && \
+    rm -rf /var/lib/apt/lists/*
 
-####################################################################################################
-######################################### ROS INSTALLATION #########################################
-####################################################################################################
+RUN export ROS_APT_SOURCE_VERSION=$(curl -s https://api.github.com/repos/ros-infrastructure/ros-apt-source/releases/latest | grep -F "tag_name" | awk -F\" '{print $4}') && \
+    curl -L -o /tmp/ros2-apt-source.deb "https://github.com/ros-infrastructure/ros-apt-source/releases/download/${ROS_APT_SOURCE_VERSION}/ros2-apt-source_${ROS_APT_SOURCE_VERSION}.$(. /etc/os-release && echo ${UBUNTU_CODENAME:-${VERSION_CODENAME}})_all.deb" && \
+    dpkg -i /tmp/ros2-apt-source.deb && \
+    rm /tmp/ros2-apt-source.deb
 
-# Add the ROS repository and the ROS key
-RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
-RUN echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null
-
-# install development packages
+# Install development tools and ROS tools
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        libbullet-dev \
+        python3-flake8-docstrings \
         python3-pip \
         python3-pytest-cov \
         ros-dev-tools \
-        libasio-dev \
-        libtinyxml2-dev \
-        libcunit1-dev \
+        python3-flake8-blind-except \
+        python3-flake8-builtins \
+        python3-flake8-class-newline \
+        python3-flake8-comprehensions \
+        python3-flake8-deprecated \
+        python3-flake8-import-order \
+        python3-flake8-quotes \
+        python3-pytest-repeat \
+        python3-pytest-rerunfailures \
     && rm -rf /var/lib/apt/lists/*
 
-# install some pip packages needed for testing
-RUN python3 -m pip install -U \
-    argcomplete \
-    flake8-blind-except \
-    flake8-builtins \
-    flake8-class-newline \
-    flake8-comprehensions \
-    flake8-deprecated \
-    flake8-docstrings \
-    flake8-import-order \
-    flake8-quotes \
-    pytest-repeat \
-    pytest-rerunfailures \
-    pytest
-
-# RUN mkdir -p ${ROS_ROOT}/src && \
-#     cd ${ROS_ROOT}
-
-# RUN vcs import --input https://raw.githubusercontent.com/ros2/ros2/${ROS_DISTRO}/ros2.repos ${ROS_ROOT}/src
-
-# RUN apt-get update && \
-#     apt-get upgrade -y && \
-#     rm -rf /var/lib/apt/lists/*
-
-# RUN rosdep init && \
-#     rosdep update && \
-#     rosdep install --from-paths src --ignore-src -y --skip-keys "fastcdr rti-connext-dds-5.3.1 urdfdom_headers"
-
-
-# # compile yaml-cpp-0.6, which some ROS packages may use (but is not in the 18.04 apt repo)
-# RUN git clone --branch yaml-cpp-0.6.0 https://github.com/jbeder/yaml-cpp yaml-cpp-0.6 && \
-#     cd yaml-cpp-0.6 && \
-#     mkdir build && \
-#     cd build && \
-#     cmake -DBUILD_SHARED_LIBS=ON .. && \
-#     make -j$(nproc) && \
-#     cp libyaml-cpp.so.0.6.0 /usr/lib/aarch64-linux-gnu/ && \
-#     ln -s /usr/lib/aarch64-linux-gnu/libyaml-cpp.so.0.6.0 /usr/lib/aarch64-linux-gnu/libyaml-cpp.so.0.6
-
-# https://answers.ros.org/question/325245/minimal-ros2-installation/?answer=325249#post-id-325249
+# Get ROS 2 code
 RUN mkdir -p ${ROS_ROOT}/src && \
-    cd ${ROS_ROOT} && \
-    rosinstall_generator --deps --rosdistro ${ROS_DISTRO} ${ROS_PKG} launch_xml launch_yaml example_interfaces > ros2.${ROS_DISTRO}.${ROS_PKG}.rosinstall && \
-    cat ros2.${ROS_DISTRO}.${ROS_PKG}.rosinstall && \
-    vcs import src < ros2.${ROS_DISTRO}.${ROS_PKG}.rosinstall
+    vcs import --input https://raw.githubusercontent.com/ros2/ros2/${ROS_DISTRO}/ros2.repos ${ROS_ROOT}/src
+
+# Install dependencies using rosdep
+RUN apt-get update && \
+    apt-get upgrade -y
+
+RUN rosdep init && \
+    rosdep update && \
+    rosdep install --from-paths ${ROS_ROOT}/src --ignore-src -y --skip-keys "fastcdr rti-connext-dds-6.0.1 urdfdom_headers"
+
 
 ####################################################################################################
 ######################################### PIP PACKAGES #############################################
 ####################################################################################################
-RUN apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt install -y --no-install-recommends \
-    python3-tk \
-    && rm -rf /var/lib/apt/lists/*
-
 COPY requirements.txt .
-RUN pip install -r requirements.txt --default-timeout=1000 --no-cache-dir
-RUN python3 -m pip install --upgrade pip
+RUN python3 -m pip install --upgrade pip && \
+    python3 -m pip install -r requirements.txt --default-timeout=1000 --no-cache-dir
 
 ####################################################################################################
 ##################################### INSTALL UNITREE SDK ##########################################
 ####################################################################################################
+# Unitree SDK2 C++ API
+RUN apt-get update && \
+	apt-get install -y --no-install-recommends \
+	    cmake gcc build-essential libeigen3-dev \
+	&& rm -rf /var/lib/apt/lists/*
 
-# RUN apt-get update && \
-# 	DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-# 	cmake gcc build-essential libeigen3-dev \
-# 	&& rm -rf /var/lib/apt/lists/*
-	
-# RUN git clone https://github.com/unitreerobotics/unitree_sdk2.git && \
-# 	cd unitree_sdk2/ && mkdir build && cd build && cmake .. && make install
+RUN git clone https://github.com/unitreerobotics/unitree_sdk2.git && \
+	cd unitree_sdk2/ && mkdir build && cd build && cmake .. && make install
+
+# Unitree SDK2 Python API
+RUN git clone https://github.com/eclipse-cyclonedds/cyclonedds -b releases/0.10.x  && \
+    cd cyclonedds && mkdir build install && cd build && \
+    cmake .. -DCMAKE_INSTALL_PREFIX=../install -DBUILD_DDSPERF=OFF && \
+    cmake --build . --target install
+    
+RUN git clone https://github.com/unitreerobotics/unitree_sdk2_python.git && \
+    cd unitree_sdk2_python && \
+    export CYCLONEDDS_HOME="/cyclonedds/install" && \
+    python3 -m pip install -e .
 
 ####################################################################################################
 ##################################### INSTALL UNITREE ROS2 #########################################
 ####################################################################################################
+# Dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
+        ros-${ROS_DISTRO}-rosidl-generator-dds-idl \
+        ros-${ROS_DISTRO}-geometry-msgs \
+        ros-${ROS_DISTRO}-rosidl-default-generators \
+        ros-${ROS_DISTRO}-ament-lint-auto \
+        libyaml-cpp-dev \
+    && rm -rf /var/lib/apt/lists/*
+    
+# Compile unitree_go and unitree_api packages
+RUN git clone https://github.com/unitreerobotics/unitree_ros2 && \
+    cd unitree_ros2/cyclonedds_ws && \
+    source /opt/ros/${ROS_DISTRO}/setup.bash && \
+    colcon build
 
 ####################################################################################################
 ########################################### FINALISATION ###########################################
@@ -131,53 +131,3 @@ ENTRYPOINT [ "" ]
 
 WORKDIR /unitree_sdk2
 CMD /bin/bash
-
-
-
-
-# # compile yaml-cpp-0.6, which some ROS packages may use (but is not in the 18.04 apt repo)
-# RUN git clone --branch yaml-cpp-0.6.0 https://github.com/jbeder/yaml-cpp yaml-cpp-0.6 && \
-#     cd yaml-cpp-0.6 && \
-#     mkdir build && \
-#     cd build && \
-#     cmake -DBUILD_SHARED_LIBS=ON .. && \
-#     make -j$(nproc) && \
-#     cp libyaml-cpp.so.0.6.0 /usr/lib/aarch64-linux-gnu/ && \
-#     ln -s /usr/lib/aarch64-linux-gnu/libyaml-cpp.so.0.6.0 /usr/lib/aarch64-linux-gnu/libyaml-cpp.so.0.6
-
-# # https://answers.ros.org/question/325245/minimal-ros2-installation/?answer=325249#post-id-325249
-# RUN mkdir -p ${ROS_ROOT}/src && \
-#     cd ${ROS_ROOT} && \
-#     rosinstall_generator --deps --rosdistro ${ROS_DISTRO} ${ROS_PKG} launch_xml launch_yaml example_interfaces > ros2.${ROS_DISTRO}.${ROS_PKG}.rosinstall && \
-#     cat ros2.${ROS_DISTRO}.${ROS_PKG}.rosinstall && \
-#     vcs import src < ros2.${ROS_DISTRO}.${ROS_PKG}.rosinstall
-
-# # install dependencies using rosdep
-# RUN apt-get update && \
-#     cd ${ROS_ROOT} && \
-#     rosdep init && \
-#     rosdep update && \
-#     # rosdep install --from-paths src --ignore-src --rosdistro ${ROS_DISTRO} -y --skip-keys "console_bridge fastcdr fastrtps rti-connext-dds-5.3.1 urdfdom_headers qt_gui" && \
-#     rosdep install --from-paths src --ignore-src --rosdistro ${ROS_DISTRO} -y --skip-keys "" && \
-#     rm -rf /var/lib/apt/lists/*
-# # Fix libyaml_vendor package issue
-
-# RUN rm ${ROS_ROOT}/src/libyaml_vendor/CMakeLists.txt && \
-#     wget --no-check-certificate https://raw.githubusercontent.com/ros2/libyaml_vendor/master/CMakeLists.txt -P ${ROS_ROOT}/src/libyaml_vendor/
-
-# # build it!
-# RUN cd ${ROS_ROOT} && colcon build --symlink-install
-
-# # setup entrypoint
-# COPY ./packages/ros_entrypoint.sh /ros_entrypoint.sh
-
-# RUN sed -i \
-#     's/source "\/opt\/ros\/$ROS_DISTRO\/setup.bash"/source "${ROS_ROOT}\/install\/setup.bash"/g' \
-#     /ros_entrypoint.sh && \
-#     cat /ros_entrypoint.sh
-
-# RUN echo 'source ${ROS_ROOT}/install/setup.bash' >> /root/.bashrc
-
-# ENTRYPOINT ["/ros_entrypoint.sh"]
-# CMD ["bash"]
-# WORKDIR /

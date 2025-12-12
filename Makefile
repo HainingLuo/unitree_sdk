@@ -26,9 +26,7 @@ compile:
 		-e DISPLAY \
     	-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
 		-v /dev:/dev \
-		-v ${PWD}/:/unitree_sdk:rw \
-		-v /datasets:/datasets:rw \
-		-v ${PWD}/unitree_sdk2:/unitree_sdk2:rw \
+		-v ${PWD}/:/unitree_dev:rw \
 		--detach \
 		--privileged \
 		--runtime nvidia \
@@ -66,7 +64,7 @@ run-local-new:
 debug:
 	docker start unitree_sdk
 	sleep 1
-	docker exec -it unitree_sdk bash -c "source /opt/ros/noetic/setup.bash && bash"
+	docker exec -it unitree_sdk bash -c "bash"
 
 debug-local:
 	# xhost +si:localuser:root >> /dev/null

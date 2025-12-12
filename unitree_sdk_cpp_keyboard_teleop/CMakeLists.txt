@@ -1,0 +1,13 @@
+cmake_minimum_required(VERSION 3.16)
+project(unitree_sdk_cpp_keyboard_teleop)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+find_package(unitree_sdk2 REQUIRED)
+
+add_executable(go2_locomotion_example go2_locomotion_example.cpp)
+target_link_libraries(go2_locomotion_example unitree_sdk2)
+
+add_executable(keyboard_testing keyboard_testing.cpp)
+target_link_libraries(keyboard_testing unitree_sdk2)
