@@ -10,7 +10,7 @@ IP_ADDRESS := $(shell hostname -I | cut -d' ' -f1)
 
 build:
 	docker build \
-	--build-arg BASE_IMAGE=nvidia/cuda:13.0.2-base-ubuntu22.04 \
+	--build-arg BASE_IMAGE=nvidia/cuda:13.0.2-base-ubuntu24.04 \
 	--build-arg ARCH=amd64 \
 	-t hainingluo/unitree_dev:latest \
 	-f Dockerfile .
@@ -45,14 +45,14 @@ compile:
 run:
 	docker start unitree_dev
 	sleep 1
-	docker exec -it unitree_dev bash -c "source /unitree_ros2/setup.sh && /bin/bash"
+	docker exec -it unitree_dev bash -c "source /unitree_ros2/setup.sh && export DISPLAY=:0 && bash"
 	docker container stop unitree_dev
 
 debug:
 	xhost +si:localuser:root >> /dev/null
 	docker start unitree_dev
 	sleep 1
-	docker exec -it unitree_dev bash -c "source /unitree_ros2/setup.sh && export DISPLAY=:0 && bash"
+	docker exec -it unitree_dev bash -c "source /opt/ros/humble/setup.sh && bash"
 
 stop:
 	docker container stop unitree_dev

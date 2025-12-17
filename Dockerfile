@@ -1,7 +1,7 @@
 ARG BASE_IMAGE
 ARG ARCH
 FROM ${BASE_IMAGE}
-ENV ROS_DISTRO=humble
+ENV ROS_DISTRO=jazzy
 ENV ROS_ROOT=/opt/ros/${ROS_DISTRO}
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -14,13 +14,17 @@ SHELL ["/bin/bash", "-c"]
 
 RUN apt update && \
     apt install -y --no-install-recommends \
-        python3.11 python3-pip \
+        python3.12 python3-pip python3-venv \
         curl wget zip unzip tar git cmake make build-essential \
         gnupg2 \
         lsb-release \
         ca-certificates \
         ffmpeg \
     && rm -rf /var/lib/apt/lists/*
+    
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+RUN python3 -m pip install --upgrade pip
 
 ####################################################################################################
 ######################################### ROS INSTALLATION #########################################
@@ -47,17 +51,9 @@ RUN export ROS_APT_SOURCE_VERSION=$(curl -s https://api.github.com/repos/ros-inf
 # Install development tools and ROS tools
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        ros-humble-desktop \
-        ros-humble-ros-base \
+        ros-${ROS_DISTRO}-desktop \
         ros-dev-tools \
     && rm -rf /var/lib/apt/lists/*
-
-####################################################################################################
-######################################### PIP PACKAGES #############################################
-####################################################################################################
-COPY requirements.txt .
-RUN python3 -m pip install --upgrade pip && \
-    python3 -m pip install -r requirements.txt --default-timeout=1000 --no-cache-dir
 
 ####################################################################################################
 ##################################### INSTALL UNITREE SDK ##########################################
@@ -99,8 +95,13 @@ RUN apt-get update && \
 # Compile unitree_go and unitree_api packages
 RUN git clone https://github.com/unitreerobotics/unitree_ros2 && \
     cd unitree_ros2/cyclonedds_ws && \
+    # cd unitree_ros2/cyclonedds_ws/src && \
+    # git clone https://github.com/ros2/rmw_cyclonedds -b jazzy && \
+    # git clone https://github.com/eclipse-cyclonedds/cyclonedds -b releases/0.10.x && \
+    # cd .. && \
+    # colcon build --packages-select cyclonedds && \
     source /opt/ros/${ROS_DISTRO}/setup.bash && \
-    colcon build
+    colcon build --packages-select unitree_go
 
 ARG ARCH
 COPY ros_setup/setup_${ARCH}.sh /unitree_ros2/setup.sh
@@ -113,6 +114,13 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ros-${ROS_DISTRO}-realsense2-camera \
     && rm -rf /var/lib/apt/lists/*
+
+####################################################################################################
+######################################### PIP PACKAGES #############################################
+####################################################################################################
+COPY requirements.txt .
+RUN python3 -m pip install --upgrade pip && \
+    python3 -m pip install -r requirements.txt --default-timeout=1000 --no-cache-dir
 
 ####################################################################################################
 ########################################### FINALISATION ###########################################
