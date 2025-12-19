@@ -21,10 +21,6 @@ RUN apt update && \
         ca-certificates \
         ffmpeg \
     && rm -rf /var/lib/apt/lists/*
-    
-RUN python3 -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-RUN python3 -m pip install --upgrade pip
 
 ####################################################################################################
 ######################################### ROS INSTALLATION #########################################
@@ -56,6 +52,30 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 ####################################################################################################
+##################################### INSTALL UNITREE ROS2 #########################################
+####################################################################################################
+# Dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
+        ros-${ROS_DISTRO}-rosidl-generator-dds-idl \
+        ros-${ROS_DISTRO}-geometry-msgs \
+        ros-${ROS_DISTRO}-rosidl-default-generators \
+        ros-${ROS_DISTRO}-ament-lint-auto \
+        libyaml-cpp-dev \
+    && rm -rf /var/lib/apt/lists/*
+    
+# Compile unitree_go and unitree_api packages
+RUN git clone https://github.com/unitreerobotics/unitree_ros2 && \
+    cd unitree_ros2/cyclonedds_ws && \
+    source /opt/ros/${ROS_DISTRO}/setup.bash && \
+    colcon build --packages-select unitree_go
+    
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+RUN python3 -m pip install --upgrade pip
+
+####################################################################################################
 ##################################### INSTALL UNITREE SDK ##########################################
 ####################################################################################################
 # Unitree SDK2 C++ API
@@ -77,31 +97,6 @@ RUN git clone https://github.com/unitreerobotics/unitree_sdk2_python.git && \
     cd unitree_sdk2_python && \
     export CYCLONEDDS_HOME="/cyclonedds/install" && \
     python3 -m pip install -e .
-
-####################################################################################################
-##################################### INSTALL UNITREE ROS2 #########################################
-####################################################################################################
-# Dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
-        ros-${ROS_DISTRO}-rosidl-generator-dds-idl \
-        ros-${ROS_DISTRO}-geometry-msgs \
-        ros-${ROS_DISTRO}-rosidl-default-generators \
-        ros-${ROS_DISTRO}-ament-lint-auto \
-        libyaml-cpp-dev \
-    && rm -rf /var/lib/apt/lists/*
-    
-# Compile unitree_go and unitree_api packages
-RUN git clone https://github.com/unitreerobotics/unitree_ros2 && \
-    cd unitree_ros2/cyclonedds_ws && \
-    # cd unitree_ros2/cyclonedds_ws/src && \
-    # git clone https://github.com/ros2/rmw_cyclonedds -b jazzy && \
-    # git clone https://github.com/eclipse-cyclonedds/cyclonedds -b releases/0.10.x && \
-    # cd .. && \
-    # colcon build --packages-select cyclonedds && \
-    source /opt/ros/${ROS_DISTRO}/setup.bash && \
-    colcon build --packages-select unitree_go
 
 ARG ARCH
 COPY ros_setup/setup_${ARCH}.sh /unitree_ros2/setup.sh
